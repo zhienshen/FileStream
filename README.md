@@ -64,7 +64,7 @@ git clone https://github.com/yourusername/filestream.git
 
 
 
-1.  **Open in IntelliJ IDEA**:
+2.  **Open in IntelliJ IDEA**:
 
 
 *   Launch IntelliJ IDEA.
@@ -76,7 +76,7 @@ git clone https://github.com/yourusername/filestream.git
 *   Click `OK` to import the project.
 
 
-1.  **Configure JDK**:
+3.  **Configure JDK**:
 
 
 *   Go to `File` > `Project Structure` > `Project Settings` > `Project`.
@@ -85,7 +85,7 @@ git clone https://github.com/yourusername/filestream.git
 *   Set the **Project SDK** to your installed JDK version.
 
 
-1.  **Add Native Library**:
+4.  **Add Native Library**:
 
 
 *   Place the `FileStream.dll` in a directory accessible to your project (e.g., `src/main/resources`).
@@ -94,7 +94,7 @@ git clone https://github.com/yourusername/filestream.git
 *   In IntelliJ, right-click on the `.dll` file and select `Add as Library`.
 
 
-1.  **Build the project**:
+5.  **Build the project**:
 
 
 *   Go to `Build` > `Build Project` or press `Ctrl + F9` (Windows/Linux) or `Command + F9` (Mac).
