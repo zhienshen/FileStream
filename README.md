@@ -312,13 +312,13 @@ This class provides constants for file stream settings. You can combine multiple
 *   `ate`: Initial position: End of file.
 
 
-*   `app`: Write to the file in append mode. If the file does not exist, it will be created. You don't need to use the setting out when using this setting.
+*   `app`: Write to the file in append mode. If the file does not exist, it will be created. You don't need to use the setting `out` when using this setting.
 
 
-*   `trunc`: Clear the file before writing or reading it. If you use this setting, you need to use the setting out, app or in.
+*   `trunc`: Clear the file before writing or reading it. If you use this setting, you need to use the setting `out`, `app` or `in`.
 
 
-*   `binary`: Write or read files in binary format. If you use this setting, you need to use the setting out, app or in.
+*   `binary`: Write or read files in binary format. If you use this setting, you need to use the setting `out`, `app` or `in`.
 
 
 ### `FileTools` Class&#xA;
