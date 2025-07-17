@@ -36,7 +36,7 @@ The `FileStream` Java library offers a comprehensive set of classes and methods 
 
 
 
-*   Java Development Kit (JDK) 8 or higher
+*   Java Development Kit (JDK) 17 or higher
 
 
 *   Windows operating system (due to the use of `.dll` library)
