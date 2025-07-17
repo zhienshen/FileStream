@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="FileStream:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/FileStream_jar</output-path>
+    <root id="archive" name="FileStream.jar">
+      <element id="module-output" name="Main" />
+    </root>
+  </artifact>
+</component>
