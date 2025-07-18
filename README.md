@@ -84,22 +84,6 @@ git clone https://github.com/zhienshen/FileStream.git
 
 *   Set the **Project SDK** to your installed JDK version.
 
-
-4.  **Add Native Library**:
-
-
-*   Place the `FileStream.dll` in a directory accessible to your project (e.g., `src/main/resources`).
-
-
-*   In IntelliJ, right-click on the `.dll` file and select `Add as Library`.
-
-
-5.  **Build the project**:
-
-
-*   Go to `Build` > `Build Project` or press `Ctrl + F9` (Windows/Linux) or `Command + F9` (Mac).
-
-
 ## Usage
 
 
