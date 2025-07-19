@@ -1,9 +1,12 @@
 package shen.zhien.filestream;
 
+/**
+ * This class provides various file operations such as checking existence, deleting, renaming,
+ * getting size, creating directories, listing directory contents, copying files, and more.
+ * It uses native methods to perform these operations.
+ */
 public class FileTools {
-    private FileTools() {
-        // 私有构造函数，防止实例化
-    }
+    private FileTools() { }
 
     /**
      * Checks if the specified file or directory exists.

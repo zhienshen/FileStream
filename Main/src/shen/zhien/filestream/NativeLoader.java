@@ -1,9 +1,11 @@
 package shen.zhien.filestream;
 import java.io.*;
 import java.nio.file.*;
-import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * To load the native library.If you want to use this library, you need to call the {@link #load()} method before using any other methods in this library.
+ */
 public class NativeLoader {
     private static final String LIBRARY_NAME = "FileStream";
     private static final String NATIVE_FOLDER_PATH_IN_JAR = "/libs/windows/x86_64/";
@@ -11,6 +13,8 @@ public class NativeLoader {
     private static final AtomicBoolean cleanupRegistered = new AtomicBoolean(false);
     private static File tempDir;
     private static File extractedDll;
+
+    private NativeLoader() { }
 
     /**
      * 加载 FileStream.dll 库
@@ -74,12 +78,5 @@ public class NativeLoader {
 
     public static void cleanupTempDir() {
         System.err.println("FileStream.NativeLoader:Due to technical reasons, temporary files cannot be automatically deleted. Please manually delete the temporary files under \"" + System.getProperty("java.io.tmpdir") + "\".");
-    }
-
-    /**
-     * 获取提取的 DLL 文件路径（用于调试）
-     */
-    public static String getExtractedDllPath() {
-        return extractedDll != null ? extractedDll.getAbsolutePath() : null;
     }
 }
