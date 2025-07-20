@@ -11,6 +11,7 @@ public final class Read {
      * Reads content from a file.The default delimiter is a line break character.
      *
      * @param File    The file path from which the content will be read.
+     * @param lines The number of lines to read from the file. If set to 0, it will read all lines.
      * @param setting The reading settings. Use the settings defined in the {@link Settings} class to specify how the file should be read.Please use '|' to combine multiple settings into one setting.Such as:<code>{@link Settings#out} | {@link Settings#binary}</code>
      * @return A string containing the content read from the file, or null if the file does not exist or the file is null or when reading file, it has something wrong.
      * @see Settings
