@@ -92,13 +92,22 @@ JNIEXPORT jint JNICALL Java_shen_zhien_filestream_Write_WriteFile__Ljava_lang_St
             auto w_t = Type::BINARY_INT;
             writer.write(reinterpret_cast<const char*>(&w_t), sizeof(Type));
 
-            writer.write(reinterpret_cast<const char*>(&content), sizeof(content));
+            writer.write(reinterpret_cast<const char*>(&content), sizeof(int));
         }
         else {
             //写入类型标识符（int）
             auto w_t = Type::INT;
             writer.write(reinterpret_cast<const char*>(&w_t), sizeof(Type));
-            writer << content;
+
+            int c_content = content;
+
+            string s_content(to_string(c_content));
+
+            size_t size = s_content.size();
+
+            writer.write((const char*)&size, sizeof(size_t));
+
+            writer.write(s_content.c_str(), size);
         }
 
         if (!writer.good()) {
@@ -166,10 +175,9 @@ JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_S
 
 
         Type type;
-        for (int i = 0; i < lines; i++)
+        for (int i = 0; i < lines;i++)
         {
             reader.read(reinterpret_cast<char*>(&type), sizeof(Type));
-            cout << (int)type << endl;
             if (reader && reader.peek() != EOF)
             {
                 switch (type)
@@ -185,28 +193,29 @@ JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_S
                 }
                 case Type::INT:
                 {
-                    int num;
-                    reader.read(reinterpret_cast<char*>(&num), sizeof(int));
-                    if (reader) {
-                        result += std::to_string(num);
-                    }
+                    size_t size;
+                    reader.read(reinterpret_cast<char*>(&size), sizeof(size_t));
+
+                    char* buffer = new char[size];
+
+                    reader.read(buffer, size);
+
+                    result += string(buffer, size);
+
+                    delete[] buffer;
                     break;
                 }
                 case Type::STRING:
                 {
-                    // 读取size_t
                     size_t size;
                     reader.read(reinterpret_cast<char*>(&size), sizeof(size_t));
-                    cout << size << endl;
-                    if (!reader) break;
-
-                    // 读取字符串内容
-                    char* buffer = new char[size];
-                    reader.read(buffer, size);
-
-                    if (reader.gcount() == static_cast<streamsize>(size)) result.append(buffer, size);
-
-                    delete[] buffer;
+                    if (reader.good() && size > 0) {
+                        std::vector<char> buffer(size);
+                        reader.read(buffer.data(), size);
+                        if (reader.gcount() == static_cast<std::streamsize>(size)) {
+                            result.append(buffer.data(), size);
+                        }
+                    }
                     break;
                 }
                 default:
@@ -230,125 +239,6 @@ JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_S
     }
 
     return env->NewStringUTF(result.c_str());
-}
-
-JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_String_2ICI(JNIEnv* env, jclass cla, jstring file, jint lines, jchar delim, jint setting) {
-    // 检查输入参数是否有效
-    if (file == nullptr) {
-        jclass exceptionClass = env->FindClass("java/lang/IllegalArgumentException");
-        env->ThrowNew(exceptionClass, "File path cannot be null");
-        return nullptr;
-    }
-
-    const char* s_file = env->GetStringUTFChars(file, nullptr);
-    if (s_file == nullptr) {
-        // 内存分配失败，抛出异常
-        jclass exceptionClass = env->FindClass("java/lang/OutOfMemoryError");
-        env->ThrowNew(exceptionClass, "Failed to allocate memory for string conversion");
-        return nullptr;
-    }
-
-    std::string result;
-    std::ifstream reader(s_file, setting);
-    env->ReleaseStringUTFChars(file, s_file); // 及时释放JNI字符串资源
-
-    // 使用RAII管理流资源
-    struct StreamGuard {
-        std::ifstream& stream;
-        ~StreamGuard() {
-            if (stream.is_open()) {
-                stream.close();
-            }
-        }
-    } streamGuard(reader);
-
-    if (!reader.is_open()) {
-        // 文件打开失败，抛出异常并返回错误信息
-        jclass exceptionClass = env->FindClass("java/io/FileNotFoundException");
-        std::string errorMsg = "Failed to open file: ";
-        env->ThrowNew(exceptionClass, errorMsg.c_str());
-        return env->NewStringUTF("");
-    }
-
-    try {
-        Type type;
-        // 提取公共的Type读取逻辑
-        auto readType = [&]() -> bool {
-            reader.read(reinterpret_cast<char*>(&type), sizeof(Type));
-            return reader.good() && !reader.eof();
-            };
-
-        for (int i = 0; i < lines; i++)
-        {
-            if (readType()) {
-                switch (type) {
-                case Type::BINARY_INT: {
-                    int32_t num;
-                    reader.read(reinterpret_cast<char*>(&num), sizeof(num));
-
-                    if (reader.gcount() != sizeof(num)) {
-                        jclass exceptionClass = env->FindClass("java/io/EOFException");
-                        env->ThrowNew(exceptionClass, "Unexpected end of file while reading integer");
-                        break;
-                    }
-
-                    result = std::to_string(num);
-                    break;
-                }
-                case Type::INT: {
-                    int num;
-                    reader.read(reinterpret_cast<char*>(&num), sizeof(int));
-                    if (reader.good()) {
-                        result = std::to_string(num);
-                    }
-                    break;
-                }
-                case Type::STRING: {
-                    size_t size;
-                    reader.read(reinterpret_cast<char*>(&size), sizeof(size_t));
-                    if (reader.good() && size > 0) {
-                        std::vector<char> buffer(size);
-                        reader.read(buffer.data(), size);
-                        if (reader.gcount() == static_cast<std::streamsize>(size)) {
-                            result.append(buffer.data(), size);
-                        }
-                    }
-                    break;
-                }
-                default:
-                    // 未知类型，抛出异常
-                    jclass exceptionClass = env->FindClass("java/io/IOException");
-                    env->ThrowNew(exceptionClass, "Unsupported data type");
-                    break;
-                }
-            }
-        }
-
-        if (reader.bad()) {
-            // 读取错误，抛出异常
-            jclass exceptionClass = env->FindClass("java/io/IOException");
-            env->ThrowNew(exceptionClass, "Error reading file");
-            result.clear();
-        }
-    }
-    catch (const std::exception& e) {
-        // 捕获异常并抛回Java层
-        jclass exceptionClass = env->FindClass("java/io/IOException");
-        std::string errorMsg = "Exception in ReadFile: ";
-        errorMsg += e.what();
-        env->ThrowNew(exceptionClass, errorMsg.c_str());
-        result.clear();
-    }
-    catch (...) {
-        // 捕获未知异常
-        jclass exceptionClass = env->FindClass("java/io/IOException");
-        env->ThrowNew(exceptionClass, "Unknown error occurred");
-        result.clear();
-    }
-
-    // 使用NewStringUTF可能导致中文等非ASCII字符乱码，建议使用NewString
-    // 此处为兼容原代码，保持原样，实际应根据需求改进
-    return env->NewStringUTF(result.empty() ? "" : result.c_str());
 }
 
 JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_String_2(JNIEnv* env, jclass cla, jstring file)
@@ -375,61 +265,50 @@ JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_S
 
         // 读取所有数据块
         Type t;
-        while (reader.read(reinterpret_cast<char*>(&t), sizeof(Type)))
+        while (reader.peek() != EOF && reader.read(reinterpret_cast<char*>(&t), sizeof(Type)))
         {
 
             switch (t)
             {
             case Type::BINARY_INT:
             {
-                int num;
-                if (reader.read(reinterpret_cast<char*>(&num), sizeof(int))) {
-                    if (result.empty()) result = std::to_string(num);
-                    else result.append(std::to_string(num));
+                int32_t num;
+                reader.read(reinterpret_cast<char*>(&num), sizeof(num));
+
+                if (reader.gcount() != sizeof(num)) {
+                    jclass exceptionClass = env->FindClass("java/io/EOFException");
+                    env->ThrowNew(exceptionClass, "Unexpected end of file while reading integer");
+                    break;
                 }
-                else {
-                    throw std::runtime_error("Failed to read BINARY_INT");
-                }
+                result.append(std::to_string(num));
                 break;
             }
             case Type::INT:
             {
-                int num;
-                if (reader.read(reinterpret_cast<char*>(&num), sizeof(int))) {
-                    if (result.empty()) result = std::to_string(num);
-                    else result.append(std::to_string(num));
-                }
-                else {
-                    throw std::runtime_error("Failed to read INT");
-                }
+                size_t size;
+                reader.read(reinterpret_cast<char*>(&size), sizeof(size_t));
+
+                char* buffer = new char[size];
+
+                reader.read(buffer, size);
+
+                result += string(buffer, size);
+
+                delete[] buffer;
                 break;
             }
             case Type::STRING:
             {
                 size_t size;
-                if (reader.read(reinterpret_cast<char*>(&size), sizeof(size_t))) {
-
-                    if (size > 1024 * 1024) { // 防止异常大的数值
-                        throw std::runtime_error("异常的size值: " + std::to_string(size));
-                    }
-
+                reader.read(reinterpret_cast<char*>(&size), sizeof(size_t));
+                if (reader.good() && size > 0) {
                     std::vector<char> buffer(size);
                     reader.read(buffer.data(), size);
-
-                    if (reader.gcount() != static_cast<std::streamsize>(size)) {
-                        throw std::runtime_error("读取内容不完整，期望 " + std::to_string(size) + " 字节，实际读取 " + std::to_string(reader.gcount()) + " 字节");
-                    }
-
-                    if (result.empty()) {
-                        result.assign(buffer.data(), size);
-                    }
-                    else {
+                    if (reader.gcount() == static_cast<std::streamsize>(size)) {
                         result.append(buffer.data(), size);
                     }
                 }
-                else {
-                    throw std::runtime_error("Failed to read STRING size");
-                }
+
                 break;
             }
             default:
