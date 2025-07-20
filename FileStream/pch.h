@@ -13,5 +13,6 @@
 #include <string>
 #include <fstream>
 #include <filesystem>
+#include <vector>
 
 #endif //PCH_H

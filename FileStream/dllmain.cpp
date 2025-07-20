@@ -29,23 +29,24 @@ JNIEXPORT jint JNICALL Java_shen_zhien_filestream_Write_WriteFile__Ljava_lang_St
         const std::string s_content(contentChars);
 
         // 设置文件打开模式
-        std::ios::openmode mode = static_cast<std::ios::openmode>(setting);
+        std::ios::openmode mode = static_cast<std::ios::openmode>(setting | std::ios::binary);
 
         // 打开文件
         std::ofstream writer(s_file, mode);
-        if (!writer.is_open()) {
-            throw std::runtime_error("Failed to open file: " + s_file);
-        }
-
-        //先写入类型标识符（string）
-        auto w_t = Type::STRING;
+        // 写入类型标识符
+        Type w_t = Type::STRING;
         writer.write(reinterpret_cast<const char*>(&w_t), sizeof(Type));
+        if (!writer) throw std::runtime_error("Failed to write type");
 
-        // 写入文件并检查错误
+        // 写入大小
+        size_t size = s_content.size();
+        writer.write(reinterpret_cast<const char*>(&size), sizeof(size_t));
+        if (!writer) throw std::runtime_error("Failed to write size");
+
+        // 写入内容
         writer.write(s_content.c_str(), s_content.size());
-        if (!writer.good()) {
-            throw std::runtime_error("Failed to write to file: " + s_file);
-        }
+        if (!writer) throw std::runtime_error("Failed to write content");
+
         // 确保释放JNI资源
         env->ReleaseStringUTFChars(file, fileChars);
         env->ReleaseStringUTFChars(content, contentChars);
@@ -55,22 +56,11 @@ JNIEXPORT jint JNICALL Java_shen_zhien_filestream_Write_WriteFile__Ljava_lang_St
         // 输出错误信息到标准错误
         std::cerr << "JNI Error: " << e.what() << std::endl;
 
-        // 返回错误码
-        if (std::string_view(e.what()).find("open") != std::string_view::npos) {
-            // 确保释放JNI资源
-            if (fileChars) env->ReleaseStringUTFChars(file, fileChars);
-            if (contentChars) env->ReleaseStringUTFChars(content, contentChars);
-            return -2; // 文件打开失败
-        }
-        else if (std::string_view(e.what()).find("write") != std::string_view::npos) {
-            // 确保释放JNI资源
-            if (fileChars) env->ReleaseStringUTFChars(file, fileChars);
-            if (contentChars) env->ReleaseStringUTFChars(content, contentChars);
-            return -3; // 文件写入失败
-        }
-        // 确保释放JNI资源
+        // 释放JNI资源
         if (fileChars) env->ReleaseStringUTFChars(file, fileChars);
         if (contentChars) env->ReleaseStringUTFChars(content, contentChars);
+
+        // 返回错误码
         return -1; // 一般错误
     }
 }
@@ -95,15 +85,6 @@ JNIEXPORT jint JNICALL Java_shen_zhien_filestream_Write_WriteFile__Ljava_lang_St
         std::ios::openmode mode = static_cast<std::ios::openmode>(setting);
 
         std::ofstream writer(s_file, mode);
-        if (!writer.is_open()) {
-            char errorMsg[256];
-            if (strerror_s(errorMsg, sizeof(errorMsg), errno) == 0) {
-                throw std::runtime_error("Failed to open file: " + s_file + ", error: " + std::string(errorMsg));
-            }
-            else {
-                throw std::runtime_error("Failed to open file: " + s_file + ", unknown error");
-            }
-        }
 
         const bool isBinaryMode = (setting & std::ios::binary) != 0;
         if (isBinaryMode) {
@@ -160,161 +141,330 @@ JNIEXPORT jint JNICALL Java_shen_zhien_filestream_Write_WriteFile__Ljava_lang_St
     }
 }
 
-JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_String_2I(JNIEnv* env, jclass cla, jstring file, jint setting)
+JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_String_2II(JNIEnv* env, jclass cla, jstring file, jint lines, jint setting)
 {
     const char* s_file = env->GetStringUTFChars(file, nullptr);
     std::string result;
-    bool isBinaryMode = (setting & std::ios::binary) != 0;
 
     try {
-        std::ifstream reader(s_file, setting);
+        std::ifstream reader(s_file, setting | ios::binary);
         if (!reader.is_open()) {
-            env->ReleaseStringUTFChars(file, s_file);
-            return env->NewStringUTF(""); // 返回空字符串而不是nullptr
+            throw std::runtime_error("Failed to open file");
         }
 
-        // 使用RAII确保流正确关闭
-        struct StreamCloser {
-            std::ifstream& stream;
-            ~StreamCloser() { stream.close(); }
-        } closer(reader);
+        // 使用RAII确保资源释放
+        struct ResourceReleaser {
+            JNIEnv* env;
+            jstring file;  // 保存 jstring
+            const char* s_file;
+            ~ResourceReleaser() {
+                if (env && file && s_file) {
+                    env->ReleaseStringUTFChars(file, s_file);
+                }
+            }
+        } releaser{ env, file, s_file };
 
-        if (isBinaryMode)
+
+        Type type;
+        for (int i = 0; i < lines; i++)
         {
-            Type type;
             reader.read(reinterpret_cast<char*>(&type), sizeof(Type));
-            if (reader.good())
+            cout << (int)type << endl;
+            if (reader && reader.peek() != EOF)
             {
-                int num = 0;
                 switch (type)
                 {
                 case Type::BINARY_INT:
                 {
+                    int num;
                     reader.read(reinterpret_cast<char*>(&num), sizeof(int));
-                    if (reader.good()) {
-                        result = to_string(num);
+                    if (reader) {
+                        result += std::to_string(num);
                     }
                     break;
                 }
                 case Type::INT:
                 {
-                    reader >> num;
-                    if (reader.good()) {
-                        result = to_string(num);
+                    int num;
+                    reader.read(reinterpret_cast<char*>(&num), sizeof(int));
+                    if (reader) {
+                        result += std::to_string(num);
                     }
                     break;
                 }
-                case Type::STRING: {
-                    std::getline(reader, result);
+                case Type::STRING:
+                {
+                    // 读取size_t
+                    size_t size;
+                    reader.read(reinterpret_cast<char*>(&size), sizeof(size_t));
+                    cout << size << endl;
+                    if (!reader) break;
+
+                    // 读取字符串内容
+                    char* buffer = new char[size];
+                    reader.read(buffer, size);
+
+                    if (reader.gcount() == static_cast<streamsize>(size)) result.append(buffer, size);
+
+                    delete[] buffer;
                     break;
                 }
-                default: {
+                default:
+                    // 未知类型，跳过
+                    reader.setstate(std::ios::failbit);
                     break;
                 }
-                }
-            }
-        }
-        else {
-            Type type;
-            reader.read(reinterpret_cast<char*>(&type), sizeof(Type));
-            std::string line;
-            if (std::getline(reader, line)) {
-                result = line;
             }
         }
 
-        // 检查读取错误
-        if (reader.bad()) {
-            result = "";
+        // 检查流状态
+        if (reader.bad())
+        {
+            throw std::runtime_error("File read error");
         }
     }
-    catch (const std::exception& e) {
+    catch (const std::exception& e)
+    {
         std::cerr << "Exception in ReadFile: " << e.what() << std::endl;
         result = "";
     }
 
-    env->ReleaseStringUTFChars(file, s_file);
     return env->NewStringUTF(result.c_str());
 }
 
-JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_String_2CI(JNIEnv* env, jclass cla, jstring file, jchar delim, jint setting)
-{
+JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_String_2ICI(JNIEnv* env, jclass cla, jstring file, jint lines, jchar delim, jint setting) {
+    // 检查输入参数是否有效
+    if (file == nullptr) {
+        jclass exceptionClass = env->FindClass("java/lang/IllegalArgumentException");
+        env->ThrowNew(exceptionClass, "File path cannot be null");
+        return nullptr;
+    }
+
     const char* s_file = env->GetStringUTFChars(file, nullptr);
-    std::string result; // 使用std::string而不是wstring
-    bool isBinaryMode = (setting & std::ios::binary) != 0;
+    if (s_file == nullptr) {
+        // 内存分配失败，抛出异常
+        jclass exceptionClass = env->FindClass("java/lang/OutOfMemoryError");
+        env->ThrowNew(exceptionClass, "Failed to allocate memory for string conversion");
+        return nullptr;
+    }
+
+    std::string result;
+    std::ifstream reader(s_file, setting);
+    env->ReleaseStringUTFChars(file, s_file); // 及时释放JNI字符串资源
+
+    // 使用RAII管理流资源
+    struct StreamGuard {
+        std::ifstream& stream;
+        ~StreamGuard() {
+            if (stream.is_open()) {
+                stream.close();
+            }
+        }
+    } streamGuard(reader);
+
+    if (!reader.is_open()) {
+        // 文件打开失败，抛出异常并返回错误信息
+        jclass exceptionClass = env->FindClass("java/io/FileNotFoundException");
+        std::string errorMsg = "Failed to open file: ";
+        env->ThrowNew(exceptionClass, errorMsg.c_str());
+        return env->NewStringUTF("");
+    }
 
     try {
-        std::ifstream reader(s_file, setting);
-        if (!reader.is_open()) {
-            env->ReleaseStringUTFChars(file, s_file);
-            return env->NewStringUTF(""); // 返回空字符串而不是nullptr
-        }
-
-        // 使用RAII确保流正确关闭
-        struct StreamCloser {
-            std::ifstream& stream;
-            ~StreamCloser() { stream.close(); }
-        } closer(reader);
-
-        // 将jchar转换为char
-        char c_delim = static_cast<char>(delim);
-
-        if (isBinaryMode)
-        {
-            Type type;
+        Type type;
+        // 提取公共的Type读取逻辑
+        auto readType = [&]() -> bool {
             reader.read(reinterpret_cast<char*>(&type), sizeof(Type));
-            if (reader.good())
-            {
-                int num = 0;
-                switch (type)
-                {
-                case Type::BINARY_INT:
-                {
-                    reader.read(reinterpret_cast<char*>(&num), sizeof(int));
-                    if (reader.good()) {
-                        result = to_string(num);
+            return reader.good() && !reader.eof();
+            };
+
+        for (int i = 0; i < lines; i++)
+        {
+            if (readType()) {
+                switch (type) {
+                case Type::BINARY_INT: {
+                    int32_t num;
+                    reader.read(reinterpret_cast<char*>(&num), sizeof(num));
+
+                    if (reader.gcount() != sizeof(num)) {
+                        jclass exceptionClass = env->FindClass("java/io/EOFException");
+                        env->ThrowNew(exceptionClass, "Unexpected end of file while reading integer");
+                        break;
                     }
+
+                    result = std::to_string(num);
                     break;
                 }
-                case Type::INT:
-                {
-                    reader >> num;
+                case Type::INT: {
+                    int num;
+                    reader.read(reinterpret_cast<char*>(&num), sizeof(int));
                     if (reader.good()) {
-                        result = to_string(num);
+                        result = std::to_string(num);
                     }
                     break;
                 }
                 case Type::STRING: {
-                    std::getline(reader, result, c_delim);
+                    size_t size;
+                    reader.read(reinterpret_cast<char*>(&size), sizeof(size_t));
+                    if (reader.good() && size > 0) {
+                        std::vector<char> buffer(size);
+                        reader.read(buffer.data(), size);
+                        if (reader.gcount() == static_cast<std::streamsize>(size)) {
+                            result.append(buffer.data(), size);
+                        }
+                    }
                     break;
                 }
-                default: {
+                default:
+                    // 未知类型，抛出异常
+                    jclass exceptionClass = env->FindClass("java/io/IOException");
+                    env->ThrowNew(exceptionClass, "Unsupported data type");
                     break;
                 }
-                }
-            }
-        }
-        else {
-            Type type;
-            reader.read(reinterpret_cast<char*>(&type), sizeof(Type));
-            std::string line;
-            if (std::getline(reader, line, c_delim)) {
-                result = line;
             }
         }
 
-        // 检查读取错误
         if (reader.bad()) {
-            result = "";
+            // 读取错误，抛出异常
+            jclass exceptionClass = env->FindClass("java/io/IOException");
+            env->ThrowNew(exceptionClass, "Error reading file");
+            result.clear();
         }
     }
     catch (const std::exception& e) {
-        std::cerr << "Exception in ReadFile: " << e.what() << std::endl;
-        result = "";
+        // 捕获异常并抛回Java层
+        jclass exceptionClass = env->FindClass("java/io/IOException");
+        std::string errorMsg = "Exception in ReadFile: ";
+        errorMsg += e.what();
+        env->ThrowNew(exceptionClass, errorMsg.c_str());
+        result.clear();
+    }
+    catch (...) {
+        // 捕获未知异常
+        jclass exceptionClass = env->FindClass("java/io/IOException");
+        env->ThrowNew(exceptionClass, "Unknown error occurred");
+        result.clear();
     }
 
-    env->ReleaseStringUTFChars(file, s_file);
-    return env->NewStringUTF(result.c_str());
+    // 使用NewStringUTF可能导致中文等非ASCII字符乱码，建议使用NewString
+    // 此处为兼容原代码，保持原样，实际应根据需求改进
+    return env->NewStringUTF(result.empty() ? "" : result.c_str());
+}
+
+JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_String_2(JNIEnv* env, jclass cla, jstring file)
+{
+    const char* c_file = nullptr;
+    std::string result;
+
+    try
+    {
+        c_file = env->GetStringUTFChars(file, nullptr);
+        if (c_file == nullptr)
+        {
+            throw std::runtime_error("Failed to get file name");
+        }
+
+        std::string s_file(c_file);
+        env->ReleaseStringUTFChars(file, c_file); // 提前释放，避免内存泄漏
+
+        std::ifstream reader(s_file, std::ios::in | std::ios::binary);
+        if (!reader.is_open())
+        {
+            throw std::runtime_error("Failed to open file: " + s_file);
+        }
+
+        // 读取所有数据块
+        Type t;
+        while (reader.read(reinterpret_cast<char*>(&t), sizeof(Type)))
+        {
+
+            switch (t)
+            {
+            case Type::BINARY_INT:
+            {
+                int num;
+                if (reader.read(reinterpret_cast<char*>(&num), sizeof(int))) {
+                    if (result.empty()) result = std::to_string(num);
+                    else result.append(std::to_string(num));
+                }
+                else {
+                    throw std::runtime_error("Failed to read BINARY_INT");
+                }
+                break;
+            }
+            case Type::INT:
+            {
+                int num;
+                if (reader.read(reinterpret_cast<char*>(&num), sizeof(int))) {
+                    if (result.empty()) result = std::to_string(num);
+                    else result.append(std::to_string(num));
+                }
+                else {
+                    throw std::runtime_error("Failed to read INT");
+                }
+                break;
+            }
+            case Type::STRING:
+            {
+                size_t size;
+                if (reader.read(reinterpret_cast<char*>(&size), sizeof(size_t))) {
+
+                    if (size > 1024 * 1024) { // 防止异常大的数值
+                        throw std::runtime_error("异常的size值: " + std::to_string(size));
+                    }
+
+                    std::vector<char> buffer(size);
+                    reader.read(buffer.data(), size);
+
+                    if (reader.gcount() != static_cast<std::streamsize>(size)) {
+                        throw std::runtime_error("读取内容不完整，期望 " + std::to_string(size) + " 字节，实际读取 " + std::to_string(reader.gcount()) + " 字节");
+                    }
+
+                    if (result.empty()) {
+                        result.assign(buffer.data(), size);
+                    }
+                    else {
+                        result.append(buffer.data(), size);
+                    }
+                }
+                else {
+                    throw std::runtime_error("Failed to read STRING size");
+                }
+                break;
+            }
+            default:
+                throw std::runtime_error("未知的Type值: " + static_cast<int>(t));
+            }
+        }
+
+        // 检查是否因文件末尾正常结束
+        if (!reader.eof()) {
+            throw std::runtime_error("读取过程中发生错误");
+        }
+
+        return env->NewStringUTF(result.c_str());
+    }
+    catch (const std::exception& e) {
+        std::cerr << "JNI Error: " << e.what() << std::endl;
+
+        // 抛出Java异常
+        jclass exceptionClass = env->FindClass("java/io/IOException");
+        if (exceptionClass) {
+            env->ThrowNew(exceptionClass, e.what());
+        }
+
+        return env->NewStringUTF(""); // 返回空字符串
+    }
+    catch (...) {
+        std::cerr << "JNI Error: Unknown exception" << std::endl;
+
+        jclass exceptionClass = env->FindClass("java/lang/RuntimeException");
+        if (exceptionClass) {
+            env->ThrowNew(exceptionClass, "Unknown exception occurred");
+        }
+
+        return env->NewStringUTF(""); // 返回空字符串
+    }
 }
 
 JNIEXPORT jboolean JNICALL Java_shen_zhien_filestream_Read_EOF(JNIEnv* env, jclass cla, jstring file, jint setting)

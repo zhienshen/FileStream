@@ -11,18 +11,26 @@ extern "C" {
 	/*
 	 * Class:     shen_zhien_filestream_Read
 	 * Method:    ReadFile
-	 * Signature: (Ljava/lang/String;I)Ljava/lang/String;
+	 * Signature: (Ljava/lang/String;II)Ljava/lang/String;
 	 */
-	JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_String_2I
-	(JNIEnv*, jclass, jstring, jint);
+	JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_String_2II
+	(JNIEnv*, jclass, jstring, jint, jint);
 
 	/*
 	 * Class:     shen_zhien_filestream_Read
 	 * Method:    ReadFile
-	 * Signature: (Ljava/lang/String;CI)Ljava/lang/String;
+	 * Signature: (Ljava/lang/String;ICI)Ljava/lang/String;
 	 */
-	JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_String_2CI
-	(JNIEnv*, jclass, jstring, jchar, jint);
+	JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_String_2ICI
+	(JNIEnv*, jclass, jstring, jint, jchar, jint);
+
+	/*
+	 * Class:     shen_zhien_filestream_Read
+	 * Method:    ReadFile
+	 * Signature: (Ljava/lang/String;)Ljava/lang/String;
+	 */
+	JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_String_2
+	(JNIEnv*, jclass, jstring);
 
 	/*
 	 * Class:     shen_zhien_filestream_Read
