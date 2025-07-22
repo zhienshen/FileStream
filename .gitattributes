@@ -66,3 +66,5 @@
 *.cpp linguist-language=C++  
 *.h linguist-language=C++
 *.hpp linguist-language=C++
+
+*.java linguist-language=Java
