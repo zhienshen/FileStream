@@ -5,11 +5,32 @@
 #include "shen_zhien_filestream_FileTools.h"
 using namespace std;
 
-enum class Type {
+enum class Type 
+{
     INT,
     STRING,
     BINARY_INT
 };
+
+enum class WRITER 
+{
+    _NULL,
+    _STRING,
+    _INT
+};
+
+enum class READER
+{
+    _NULL,
+    _LINES,
+    _ALL
+};
+
+WRITER _WRITER = WRITER::_NULL;
+READER _READER = READER::_NULL;
+
+std::ofstream writer = ofstream("");
+std::ifstream reader = ifstream("");
 
 JNIEXPORT jint JNICALL Java_shen_zhien_filestream_Write_WriteFile__Ljava_lang_String_2Ljava_lang_String_2I(JNIEnv* env, jclass cla, jstring file, jstring content, jint setting)
 {
@@ -32,21 +53,27 @@ JNIEXPORT jint JNICALL Java_shen_zhien_filestream_Write_WriteFile__Ljava_lang_St
         std::ios::openmode mode = static_cast<std::ios::openmode>(setting | std::ios::binary);
 
         // 打开文件
-        std::ofstream writer(s_file, mode);
+        if (_WRITER != WRITER::_STRING) 
+        {
+            writer.close();
+            writer.open(s_file, mode);
+            _WRITER = WRITER::_STRING;
+        }
         // 写入类型标识符
         Type w_t = Type::STRING;
         writer.write(reinterpret_cast<const char*>(&w_t), sizeof(Type));
-        if (!writer) throw std::runtime_error("Failed to write type");
+        if (!writer) throw std::runtime_error("Failed to write type.At WRITER::_STRING.");
 
         // 写入大小
         size_t size = s_content.size();
         writer.write(reinterpret_cast<const char*>(&size), sizeof(size_t));
-        if (!writer) throw std::runtime_error("Failed to write size");
 
         // 写入内容
         writer.write(s_content.c_str(), s_content.size());
-        if (!writer) throw std::runtime_error("Failed to write content");
 
+
+
+        if (!writer) throw std::runtime_error("Failed to write content.At WRITER::_STRING.");
         // 确保释放JNI资源
         env->ReleaseStringUTFChars(file, fileChars);
         env->ReleaseStringUTFChars(content, contentChars);
@@ -65,36 +92,48 @@ JNIEXPORT jint JNICALL Java_shen_zhien_filestream_Write_WriteFile__Ljava_lang_St
     }
 }
 
-JNIEXPORT jint JNICALL Java_shen_zhien_filestream_Write_WriteFile__Ljava_lang_String_2II(JNIEnv* env, jclass cla, jstring file, jint content, jint setting) {
+JNIEXPORT jint JNICALL Java_shen_zhien_filestream_Write_WriteFile__Ljava_lang_String_2II(JNIEnv* env, jclass cla, jstring file, jint content, jint setting) 
+{
     const char* fileChars = env->GetStringUTFChars(file, nullptr);
-    if (!fileChars) {
+    if (!fileChars) 
+    {
         env->ThrowNew(env->FindClass("java/io/IOException"), "Failed to get file name");
         return -1;
     }
 
     // 使用RAII管理资源
-    struct JNIStringReleaser {
+    struct JNIStringReleaser 
+    {
         JNIEnv* env;
         const jstring str;
         const char* chars;
         ~JNIStringReleaser() { env->ReleaseStringUTFChars(str, chars); }
     } releaser{ env, file, fileChars };
 
-    try {
+    try 
+    {
+
         const std::string s_file(fileChars);
         std::ios::openmode mode = static_cast<std::ios::openmode>(setting);
 
-        std::ofstream writer(s_file, mode);
-
+        if (_WRITER != WRITER::_INT)
+        {
+            writer.close();
+            writer.open(s_file, mode);
+            _WRITER = WRITER::_INT;
+        }
+        if (!writer.is_open()) throw std::runtime_error("Failed to open file.At WRITER::_INT.");
         const bool isBinaryMode = (setting & std::ios::binary) != 0;
-        if (isBinaryMode) {
+        if (isBinaryMode) 
+        {
             //先写入类型标识符（binary int）
             auto w_t = Type::BINARY_INT;
             writer.write(reinterpret_cast<const char*>(&w_t), sizeof(Type));
 
             writer.write(reinterpret_cast<const char*>(&content), sizeof(int));
         }
-        else {
+        else 
+        {
             //写入类型标识符（int）
             auto w_t = Type::INT;
             writer.write(reinterpret_cast<const char*>(&w_t), sizeof(Type));
@@ -110,37 +149,34 @@ JNIEXPORT jint JNICALL Java_shen_zhien_filestream_Write_WriteFile__Ljava_lang_St
             writer.write(s_content.c_str(), size);
         }
 
-        if (!writer.good()) {
-            char errorMsg[256];
-            if (strerror_s(errorMsg, sizeof(errorMsg), errno) == 0) {
-                throw std::runtime_error("Failed to write to file: " + s_file + ", error: " + std::string(errorMsg));
-            }
-            else {
-                throw std::runtime_error("Failed to write to file: " + s_file + ", unknown error");
-            }
-        }
+        if (!writer) throw std::runtime_error("Failed to write content.At WRITER::_INT.");
 
         return 0; // 成功
     }
-    catch (const std::exception& e) {
+    catch (const std::runtime_error& e) 
+    {
         std::cerr << "JNI Error: " << e.what() << std::endl;
 
         // 抛出Java异常
         jclass exceptionClass = env->FindClass("java/io/IOException");
-        if (exceptionClass) {
+        if (exceptionClass) 
+        {
             env->ThrowNew(exceptionClass, e.what());
         }
 
         // 根据错误类型返回不同错误码
-        if (std::string_view(e.what()).find("open") != std::string_view::npos) {
+        if (std::string_view(e.what()).find("open") != std::string_view::npos) 
+        {
             return -2; // 文件打开失败
         }
-        else if (std::string_view(e.what()).find("write") != std::string_view::npos) {
+        else if (std::string_view(e.what()).find("write") != std::string_view::npos) 
+        {
             return -3; // 文件写入失败
         }
         return -1; // 一般错误
     }
-    catch (...) {
+    catch (...)
+    {
         std::cerr << "JNI Error: Unknown exception" << std::endl;
         jclass exceptionClass = env->FindClass("java/lang/RuntimeException");
         if (exceptionClass) {
@@ -155,14 +191,28 @@ JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_S
     const char* s_file = env->GetStringUTFChars(file, nullptr);
     std::string result;
 
-    try {
-        std::ifstream reader(s_file, setting | ios::binary);
-        if (!reader.is_open()) {
+    try 
+    {
+        if (_READER != READER::_LINES)
+        {
+            reader.close();
+            reader.open(s_file, setting);
+            _READER = READER::_LINES;
+        }
+        else
+        {
+            streampos tellg = reader.tellg();
+            reader.open(s_file, setting);
+            reader.seekg(tellg);
+        }
+        if (!reader.is_open()) 
+        {
             throw std::runtime_error("Failed to open file");
         }
 
         // 使用RAII确保资源释放
-        struct ResourceReleaser {
+        struct ResourceReleaser
+        {
             JNIEnv* env;
             jstring file;  // 保存 jstring
             const char* s_file;
@@ -184,7 +234,7 @@ JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_S
                 {
                 case Type::BINARY_INT:
                 {
-                    int num;
+                    int num = 0;
                     reader.read(reinterpret_cast<char*>(&num), sizeof(int));
                     if (reader) {
                         result += std::to_string(num);
@@ -193,7 +243,7 @@ JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_S
                 }
                 case Type::INT:
                 {
-                    size_t size;
+                    size_t size = 0;
                     reader.read(reinterpret_cast<char*>(&size), sizeof(size_t));
 
                     char* buffer = new char[size];
@@ -207,7 +257,7 @@ JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_S
                 }
                 case Type::STRING:
                 {
-                    size_t size;
+                    size_t size = 0;
                     reader.read(reinterpret_cast<char*>(&size), sizeof(size_t));
                     if (reader.good() && size > 0) {
                         std::vector<char> buffer(size);
@@ -257,7 +307,9 @@ JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_S
         std::string s_file(c_file);
         env->ReleaseStringUTFChars(file, c_file); // 提前释放，避免内存泄漏
 
-        std::ifstream reader(s_file, std::ios::in | std::ios::binary);
+        reader.close();
+        reader.open(s_file, ios::in | ios::binary);
+
         if (!reader.is_open())
         {
             throw std::runtime_error("Failed to open file: " + s_file);
@@ -346,7 +398,16 @@ JNIEXPORT jstring JNICALL Java_shen_zhien_filestream_Read_ReadFile__Ljava_lang_S
     }
 }
 
-JNIEXPORT jboolean JNICALL Java_shen_zhien_filestream_Read_EOF(JNIEnv* env, jclass cla, jstring file, jint setting)
+JNIEXPORT jboolean JNICALL Java_shen_zhien_filestream_Read_EOF__(JNIEnv*, jclass)
+{
+    if (!reader) return true;
+    char c;
+    reader >> c;
+    return reader.eof();
+}
+
+
+JNIEXPORT jboolean JNICALL Java_shen_zhien_filestream_Read_EOF__Ljava_lang_String_2(JNIEnv* env, jclass cla, jstring file)
 {
     const char* fileChars = nullptr;
 
@@ -356,7 +417,8 @@ JNIEXPORT jboolean JNICALL Java_shen_zhien_filestream_Read_EOF(JNIEnv* env, jcla
 
         const std::string s_file(fileChars);
 
-        std::ifstream EOFReader(s_file, setting);
+        std::ifstream EOFReader(s_file);
+        if (!EOFReader) throw runtime_error("Faild to open file");
 
         char Char;
         EOFReader >> Char;
@@ -630,8 +692,12 @@ BOOL APIENTRY DllMain(HMODULE hModule,
     switch (ul_reason_for_call)
     {
     case DLL_PROCESS_ATTACH:
+        cout << "FileStream library loaded successfully." << endl;
+        break;
     case DLL_THREAD_ATTACH:
+        break;
     case DLL_THREAD_DETACH:
+        break;
     case DLL_PROCESS_DETACH:
         break;
     }

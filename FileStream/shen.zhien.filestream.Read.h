@@ -27,10 +27,26 @@ extern "C" {
 	/*
 	 * Class:     shen_zhien_filestream_Read
 	 * Method:    EOF
-	 * Signature: (Ljava/lang/String;I)Z
+	 * Signature: ()Z
 	 */
-	JNIEXPORT jboolean JNICALL Java_shen_zhien_filestream_Read_EOF
-	(JNIEnv*, jclass, jstring, jint);
+	JNIEXPORT jboolean JNICALL Java_shen_zhien_filestream_Read_EOF__
+	(JNIEnv*, jclass);
+
+	/*
+	 * Class:     shen_zhien_filestream_Read
+	 * Method:    EOF
+	 * Signature: (Ljava/lang/String;)Z
+	 */
+	JNIEXPORT jboolean JNICALL Java_shen_zhien_filestream_Read_EOF__Ljava_lang_String_2
+	(JNIEnv*, jclass, jstring);
+
+	/*
+	 * Class:     shen_zhien_filestream_Read
+	 * Method:    ResetFile
+	 * Signature: ()V
+	 */
+	JNIEXPORT void JNICALL Java_shen_zhien_filestream_Read_ResetFile
+	(JNIEnv*, jclass);
 
 #ifdef __cplusplus
 }
