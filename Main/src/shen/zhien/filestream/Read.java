@@ -28,13 +28,24 @@ public final class Read {
     public static native String ReadFile(String File);
 
     /**
-     * Checks if the end of the file has been reached.
+     * Checks if the end of the file what you are reading has been reached.
      *
-     * @param File    The file path to check.
-     * @param setting The reading settings. Use the settings defined in the {@link Settings} class to specify how the file should be read.Please use '|' to combine multiple settings into one setting.Such as:<code>{@link Settings#in} | {@link Settings#binary}</code>
      * @return true if the end of the file has been reached, false otherwise.
      * @see Settings
      */
-    public static native boolean EOF(String File, int setting);
+    public static native boolean EOF();
+
+    /**
+     * Checks if the end of the file has been reached.You can use this method to check if the file is empty.
+     *
+     * @param File The file path to check.
+     * @return true if the end of the file has been reached, false otherwise.
+     */
+    public static native boolean EOF(String File);
+
+    /**
+     *
+     */
+    public static native void ResetFile();
 
 }
