@@ -102,7 +102,7 @@ import shen.zhien.filestream.NativeLoader;
 public class Main {
 
 
-   public static void main(String\[] args) {
+   public static void main(String[] args) {
 
 
        try {
@@ -146,7 +146,7 @@ import shen.zhien.filestream.Settings;
 public class ReadExample {
 
 
-   public static void main(String\[] args) {
+   public static void main(String[] args) {
 
 
        String filePath = "path/to/your/file.txt";
@@ -196,7 +196,7 @@ import shen.zhien.filestream.Settings;
 public class WriteExample {
 
 
-   public static void main(String\[] args) {
+   public static void main(String[] args) {
 
 
        String filePath = "path/to/your/file.txt";
@@ -246,7 +246,7 @@ import shen.zhien.filestream.FileTools;
 public class FileToolsExample {
 
 
-   public static void main(String\[] args) {
+   public static void main(String[] args) {
 
 
        String filePath = "path/to/your/file.txt";
