@@ -62,8 +62,9 @@
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
 
-*.cpp linguist-language=C++
-
+# 让 Java 配置文件不参与语言统计
+*.xml linguist-detectable=false  
+# 明确 C++ 文件识别
+*.cpp linguist-language=C++  
 *.h linguist-language=C++
-
 *.hpp linguist-language=C++
