@@ -18,7 +18,7 @@ The `FileStream` Java library offers a comprehensive set of classes and methods 
 
 
 
-*   **File Reading**: Read content from files with customizable settings and delimiters.
+*   **File Reading**: Read content from files with customizable settings.
 
 
 *   **File Writing**: Write content to files with different writing modes.
